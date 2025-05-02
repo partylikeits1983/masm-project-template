@@ -1,11 +1,8 @@
 # MASM Project Template
 
-### Running the program:
-```bash
-cargo run --release
-```
+A minimal example for compiling, deploying, and testing MASM contracts & notes.
 
-### Running the tests:
+### Run the miden-node locally:
 1) Install & setup miden-node:
 ```bash
 ./setup_node.sh
@@ -16,7 +13,15 @@ cargo run --release
 ./start_node.sh
 ```
 
-3) In a separate terminal, run the tests:
+
+### Running the program:
+*Before running, ensure you have the miden-node running locally in a separate terminal window:*
+```bash
+cargo run --release
+```
+
+### Running the tests:
+*Before running, ensure you have the miden-node running locally in a separate terminal window:*
 ```bash
 cargo test --release -- --nocapture
 ```
