@@ -1,0 +1,8 @@
+/target
+/keystore
+*.sqlite3
+
+/node-data
+/accounts
+/data
+genesis.toml
