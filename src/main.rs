@@ -77,9 +77,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Deleting keystore & store to show how to fetch public state
     delete_keystore_and_store(None).await;
 
-    /*     let endpoint = Endpoint::testnet();
-       let mut client = instantiate_client(endpoint, None).await?;
-    */
+    let endpoint = Endpoint::testnet();
+    let mut client = instantiate_client(endpoint, None).await?;
+
     client
         .import_account_by_id(counter_contract.id())
         .await
