@@ -1,9 +1,12 @@
-use masm_project_template::common::{
-    create_basic_account, create_library, create_public_immutable_contract, create_public_note,
-    create_tx_script, delete_keystore_and_store, instantiate_client, wait_for_note,
+use masm_project_template::common::create_public_immutable_contract;
+
+use miden_client_tools::{
+    create_basic_account, create_library, create_public_note, create_tx_script,
+    delete_keystore_and_store, instantiate_client, wait_for_note,
 };
+
 use miden_client::{
-    ClientError, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
+    ClientError, keystore::FilesystemKeyStore, rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
 use miden_crypto::Word;
@@ -12,10 +15,10 @@ use tokio::time::{Duration, sleep};
 
 #[tokio::test]
 async fn increment_counter_with_script() -> Result<(), ClientError> {
-    delete_keystore_and_store().await;
+    delete_keystore_and_store(None).await;
 
     let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint).await?;
+    let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
     println!("Latest block: {}", sync_summary.block_num);
@@ -25,7 +28,10 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
-    let (counter_contract, counter_seed) = create_public_immutable_contract(&counter_code).await?;
+    let (counter_contract, counter_seed) =
+        create_public_immutable_contract(&mut client, &counter_code)
+            .await
+            .unwrap();
     println!("contract id: {:?}", counter_contract.id().to_hex());
 
     client
@@ -64,12 +70,11 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 4: Validate Updated State
     // -------------------------------------------------------------------------
-    sleep(Duration::from_secs(5)).await;
+    sleep(Duration::from_secs(10)).await;
 
-    delete_keystore_and_store().await;
+    delete_keystore_and_store(None).await;
 
-    let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint).await?;
+    let mut client = instantiate_client(endpoint, None).await.unwrap();
 
     client
         .import_account_by_id(counter_contract.id())
@@ -89,10 +94,11 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
 
 #[tokio::test]
 async fn increment_counter_with_note() -> Result<(), ClientError> {
-    delete_keystore_and_store().await;
+    delete_keystore_and_store(None).await;
 
     let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint).await?;
+    let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
+
     let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
@@ -101,14 +107,19 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 1: Create Basic User Account
     // -------------------------------------------------------------------------
-    let (alice_account, _) = create_basic_account(&mut client, keystore.clone()).await?;
+    let (alice_account, _) = create_basic_account(&mut client, keystore.clone())
+        .await
+        .unwrap();
 
     // -------------------------------------------------------------------------
     // STEP 2: Create Counter Smart Contract
     // -------------------------------------------------------------------------
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
-    let (counter_contract, counter_seed) = create_public_immutable_contract(&counter_code).await?;
+    let (counter_contract, counter_seed) =
+        create_public_immutable_contract(&mut client, &counter_code)
+            .await
+            .unwrap();
     println!("contract id: {:?}", counter_contract.id().to_hex());
 
     client
@@ -125,17 +136,23 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     let library_path = "external_contract::counter_contract";
     let library = create_library(account_code, library_path).unwrap();
 
-    let note_assets = NoteAssets::new(vec![]).unwrap();
-
-    let increment_note =
-        create_public_note(&mut client, note_code, library, alice_account, note_assets)
-            .await
-            .unwrap();
+    let increment_note = create_public_note(
+        &mut client,
+        note_code,
+        Some(library),
+        alice_account,
+        None,
+        None,
+    )
+    .await
+    .unwrap();
 
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note
     // -------------------------------------------------------------------------
-    wait_for_note(&mut client, &counter_contract, &increment_note).await?;
+    wait_for_note(&mut client, &counter_contract, &increment_note)
+        .await
+        .unwrap();
 
     let script_code = fs::read_to_string(Path::new("./masm/scripts/nop_script.masm")).unwrap();
     let tx_script = create_tx_script(script_code, None).unwrap();
@@ -157,10 +174,9 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     sleep(Duration::from_secs(5)).await;
 
-    delete_keystore_and_store().await;
+    delete_keystore_and_store(None).await;
 
-    let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint).await?;
+    let mut client = instantiate_client(endpoint, None).await.unwrap();
 
     client
         .import_account_by_id(counter_contract.id())

@@ -161,6 +161,7 @@ pub async fn create_basic_account(
 
 // Contract builder helper function
 pub async fn create_public_immutable_contract(
+    client: &mut Client,
     account_code: &String,
 ) -> Result<(Account, Word), ClientError> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
@@ -178,16 +179,6 @@ pub async fn create_public_immutable_contract(
     .unwrap()
     .with_supports_all_types();
 
-    // @dev this is bad that I need to get an anchor block to create a contract
-    let endpoint = Endpoint::localhost();
-    let timeout_ms = 10_000;
-    let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
-    let mut client = ClientBuilder::new()
-        .with_rpc(rpc_api.clone())
-        .with_filesystem_keystore("./keystore")
-        .in_debug_mode(true)
-        .build()
-        .await?;
     let anchor_block = client.get_latest_epoch_block().await.unwrap();
 
     let mut init_seed = [0_u8; 32];
@@ -203,18 +194,6 @@ pub async fn create_public_immutable_contract(
 
     Ok((counter_contract, counter_seed))
 }
-
-/* pub async fn create_script_with_library(
-    script_code: String,
-    library: Library,
-) -> Result<TransactionScript, Error> {
-    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
-    let tx_script =
-        TransactionScript::compile(script_code, [], assembler.with_library(&library).unwrap())
-            .unwrap();
-
-    Ok(tx_script)
-} */
 
 pub fn create_tx_script(
     script_code: String,

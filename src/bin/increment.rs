@@ -1,13 +1,11 @@
 // src/main.rs  — cargo run
 use std::{fs, path::Path};
 
-use masm_project_template::common::create_public_immutable_contract;
-
 use miden_client_tools::{
     create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
 };
 
-use miden_client::{rpc::Endpoint, transaction::TransactionRequestBuilder};
+use miden_client::{account::AccountId, rpc::Endpoint, transaction::TransactionRequestBuilder};
 use miden_crypto::Word;
 use tokio::time::{Duration, sleep};
 
@@ -25,19 +23,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("⛓  Latest block: {}", sync_summary.block_num);
 
     // -------------------------------------------------------------------------
-    // STEP 1 – Deploy the counter contract
+    // STEP 1 – Query Counter State
     // -------------------------------------------------------------------------
-    let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
-
-    let (counter_contract, counter_seed) =
-        create_public_immutable_contract(&mut client, &counter_code).await?;
+    let counter_contract_id = AccountId::from_hex("0x7a933b1d1ab6dd00000a9d4ee2363b").unwrap();
 
     client
-        .add_account(&counter_contract, Some(counter_seed), false)
+        .import_account_by_id(counter_contract_id)
         .await
         .unwrap();
 
-    println!("📄 Counter contract ID: {}", counter_contract.id().to_hex());
+    let account_state = client
+        .get_account(counter_contract_id)
+        .await?
+        .expect("counter contract not found");
+
+    let word: Word = account_state.account().storage().get_item(0)?.into();
+    let counter_val = word.get(3).unwrap().as_int();
+    println!("🔢 Counter value before tx: {}", counter_val);
 
     // -------------------------------------------------------------------------
     // STEP 2 – Compile the increment script
@@ -61,7 +63,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap();
 
     let tx_result = client
-        .new_transaction(counter_contract.id(), tx_increment_request)
+        .new_transaction(counter_contract_id, tx_increment_request)
         .await
         .unwrap();
 
@@ -71,28 +73,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sleep(Duration::from_secs(7)).await;
 
     // -------------------------------------------------------------------------
-    // STEP 4 – Fetch contract state & verify
+    // STEP 4 – Fetch contract state & verify increment
     // -------------------------------------------------------------------------
-
-    // Deleting keystore & store to show how to fetch public state
-    delete_keystore_and_store(None).await;
-
-    /*     let endpoint = Endpoint::testnet();
-       let mut client = instantiate_client(endpoint, None).await?;
-    */
-    client
-        .import_account_by_id(counter_contract.id())
-        .await
-        .unwrap();
+    client.sync_state().await.unwrap();
 
     let account_state = client
-        .get_account(counter_contract.id())
+        .get_account(counter_contract_id)
         .await?
         .expect("counter contract not found");
 
     let word: Word = account_state.account().storage().get_item(0)?.into();
     let counter_val = word.get(3).unwrap().as_int();
     println!("🔢 Counter value after tx: {}", counter_val);
+
     println!("✅ Success! The counter was incremented.");
 
     let tx_id = tx_result.executed_transaction().id();

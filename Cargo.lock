@@ -1201,6 +1201,7 @@ version = "0.1.0"
 dependencies = [
  "miden-assembly",
  "miden-client",
+ "miden-client-tools",
  "miden-crypto",
  "miden-lib",
  "miden-objects",
@@ -1288,6 +1289,25 @@ dependencies = [
  "tonic-build",
  "tracing",
  "web-sys",
+]
+
+[[package]]
+name = "miden-client-tools"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32c7059dd4fe57970cc2670f54aab65365020131340bfff41fa9bb39a762eba6"
+dependencies = [
+ "miden-assembly",
+ "miden-client",
+ "miden-crypto",
+ "miden-lib",
+ "miden-objects",
+ "miden-tx",
+ "rand 0.9.1",
+ "rand_chacha 0.9.0",
+ "serde",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]

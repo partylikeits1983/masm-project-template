@@ -1,7 +1,5 @@
 use.external_contract::counter_contract
 
 begin
-    push.101 debug.stack drop
     call.counter_contract::increment
-    push.202 debug.stack drop
 end

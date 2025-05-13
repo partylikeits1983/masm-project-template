@@ -5,17 +5,15 @@ A minimal example for compiling, deploying, and testing MASM contracts & notes.
 ### Run the miden-node locally:
 1) Install & setup miden-node:
 ```bash
-./setup_node.sh
+./scripts/setup_node.sh
 ```
 
-2) Run the node: 
+2) Run the node locally: 
 ```bash
-./start_node.sh
+./scripts/start_node.sh
 ```
 
-
-### Running the program:
-*Before running, ensure you have the miden-node running locally in a separate terminal window:*
+### Running the program on testnet:
 ```bash
 cargo run --release
 ```
@@ -23,5 +21,5 @@ cargo run --release
 ### Running the tests:
 *Before running, ensure you have the miden-node running locally in a separate terminal window:*
 ```bash
-cargo test --release -- --nocapture
+cargo test --release -- --nocapture --test-threads=1
 ```
