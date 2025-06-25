@@ -14,7 +14,7 @@ use miden_client::{
         NoteRecipient, NoteRelevance, NoteScript, NoteTag, NoteType,
     },
     rpc::{Endpoint, TonicRpcClient},
-    store::InputNoteRecord,
+    store::{InputNoteRecord, NoteFilter},
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
 };
 use miden_crypto::{Felt, Word};
@@ -25,8 +25,7 @@ use miden_lib::{
 use miden_objects::account::AccountComponent;
 use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
-use std::{sync::Arc, time::Duration};
-use tokio::time::sleep;
+use std::sync::Arc;
 
 use miden_crypto::rand::FeltRng;
 
@@ -214,16 +213,25 @@ pub fn create_tx_script(
 // Waits for note
 pub async fn wait_for_note(
     client: &mut Client,
-    account_id: &Account,
+    account_id: Option<Account>,
     expected: &Note,
 ) -> Result<(), ClientError> {
+    use tokio::time::{Duration, sleep};
+
     loop {
         client.sync_state().await?;
 
-        let notes: Vec<(InputNoteRecord, Vec<(AccountId, NoteRelevance)>)> =
-            client.get_consumable_notes(Some(account_id.id())).await?;
+        // Notes that can be consumed right now
+        let consumable: Vec<(InputNoteRecord, Vec<(AccountId, NoteRelevance)>)> = client
+            .get_consumable_notes(account_id.as_ref().map(|acc| acc.id()))
+            .await?;
 
-        let found = notes.iter().any(|(rec, _)| rec.id() == expected.id());
+        // Notes submitted that are now committed
+        let committed: Vec<InputNoteRecord> = client.get_input_notes(NoteFilter::Committed).await?;
+
+        // Check both vectors
+        let found = consumable.iter().any(|(rec, _)| rec.id() == expected.id())
+            || committed.iter().any(|rec| rec.id() == expected.id());
 
         if found {
             println!("✅ note found {}", expected.id().to_hex());
@@ -231,7 +239,8 @@ pub async fn wait_for_note(
         }
 
         println!("Note {} not found. Waiting...", expected.id().to_hex());
-        sleep(Duration::from_secs(3)).await;
+        sleep(Duration::from_secs(2)).await;
     }
+
     Ok(())
 }

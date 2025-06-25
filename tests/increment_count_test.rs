@@ -1,15 +1,17 @@
-use masm_project_template::common::create_public_immutable_contract;
+use masm_project_template::common::{
+    create_basic_account, create_public_immutable_contract, create_public_note, wait_for_note,
+};
 
 use miden_client_tools::{
-    create_basic_account, create_library, create_public_note, create_tx_script,
-    delete_keystore_and_store, instantiate_client, wait_for_note,
+    create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
 };
 
 use miden_client::{
-    ClientError, keystore::FilesystemKeyStore, rpc::Endpoint,
+    ClientError, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
 use miden_crypto::Word;
+use miden_objects::account::NetworkId;
 use std::{fs, path::Path};
 use tokio::time::{Duration, sleep};
 
@@ -70,7 +72,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 4: Validate Updated State
     // -------------------------------------------------------------------------
-    sleep(Duration::from_secs(10)).await;
+    sleep(Duration::from_secs(7)).await;
 
     delete_keystore_and_store(None).await;
 
@@ -81,13 +83,20 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
         .await
         .unwrap();
 
-    let new_account_state = client.get_account(counter_contract.id()).await.unwrap();
+    let new_account_state = client
+        .get_account(counter_contract.id())
+        .await
+        .unwrap()
+        .unwrap();
 
-    if let Some(account) = new_account_state.as_ref() {
-        let count: Word = account.account().storage().get_item(0).unwrap().into();
-        let val = count.get(3).unwrap().as_int();
-        assert_eq!(val, 1);
-    }
+    let count: Word = new_account_state
+        .account()
+        .storage()
+        .get_item(0)
+        .unwrap()
+        .into();
+    let val = count.get(3).unwrap().as_int();
+    assert_eq!(val, 1);
 
     Ok(())
 }
@@ -110,6 +119,10 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     let (alice_account, _) = create_basic_account(&mut client, keystore.clone())
         .await
         .unwrap();
+    println!(
+        "alice account id: {:?}",
+        alice_account.id().to_bech32(NetworkId::Testnet)
+    );
 
     // -------------------------------------------------------------------------
     // STEP 2: Create Counter Smart Contract
@@ -120,7 +133,10 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
         create_public_immutable_contract(&mut client, &counter_code)
             .await
             .unwrap();
-    println!("contract id: {:?}", counter_contract.id().to_hex());
+    println!(
+        "contract id: {:?}",
+        counter_contract.id().to_bech32(NetworkId::Testnet)
+    );
 
     client
         .add_account(&counter_contract, Some(counter_seed), false)
@@ -131,26 +147,24 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // STEP 3: Prepare & Create the Note
     // -------------------------------------------------------------------------
     let note_code = fs::read_to_string(Path::new("./masm/notes/increment_note.masm")).unwrap();
-
     let account_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
+
     let library_path = "external_contract::counter_contract";
     let library = create_library(account_code, library_path).unwrap();
 
-    let increment_note = create_public_note(
-        &mut client,
-        note_code,
-        Some(library),
-        alice_account,
-        None,
-        None,
-    )
-    .await
-    .unwrap();
+    let note_assets = NoteAssets::new(vec![]).unwrap();
+
+    let increment_note =
+        create_public_note(&mut client, note_code, library, alice_account, note_assets)
+            .await
+            .unwrap();
+
+    println!("increment note created, waiting for onchain commitment");
 
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note
     // -------------------------------------------------------------------------
-    wait_for_note(&mut client, &counter_contract, &increment_note)
+    wait_for_note(&mut client, None, &increment_note)
         .await
         .unwrap();
 

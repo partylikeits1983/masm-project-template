@@ -25,7 +25,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------------------------
     // STEP 1 – Query Counter State
     // -------------------------------------------------------------------------
-    let counter_contract_id = AccountId::from_hex("0x6bcba882e4150400000a5423babc0f").unwrap();
+    let (_network_id, counter_contract_id) =
+        AccountId::from_bech32("mtst1qq6uwe46p92uzqqqqwcrdvh0ry5waafp").unwrap();
 
     client
         .import_account_by_id(counter_contract_id)

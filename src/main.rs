@@ -1,4 +1,3 @@
-// src/main.rs  — cargo run
 use std::{fs, path::Path};
 
 use masm_project_template::common::create_public_immutable_contract;
@@ -9,6 +8,7 @@ use miden_client_tools::{
 
 use miden_client::{rpc::Endpoint, transaction::TransactionRequestBuilder};
 use miden_crypto::Word;
+use miden_objects::account::NetworkId;
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
@@ -37,7 +37,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    println!("📄 Counter contract ID: {}", counter_contract.id().to_hex());
+    println!(
+        "📄 Counter contract ID: {}",
+        counter_contract.id().to_bech32(NetworkId::Testnet)
+    );
 
     // -------------------------------------------------------------------------
     // STEP 2 – Compile the increment script
