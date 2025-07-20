@@ -1,9 +1,5 @@
-use miden_assembly::{
-    Assembler, DefaultSourceManager, Library, LibraryPath,
-    ast::{Module, ModuleKind},
-};
 use miden_client::{
-    Client, ClientError,
+    Client, ClientError, Felt, Word,
     account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageSlot},
     auth::AuthSecretKey,
     builder::ClientBuilder,
@@ -17,12 +13,12 @@ use miden_client::{
     store::{InputNoteRecord, NoteFilter},
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
 };
-use miden_crypto::{Felt, Word};
-use miden_lib::{
-    account::{auth::RpoFalcon512, wallets::BasicWallet},
-    transaction::TransactionKernel,
+use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_lib::transaction::TransactionKernel;
+use miden_objects::{
+    account::AccountComponent,
+    assembly::{Assembler, DefaultSourceManager, Library, LibraryPath, Module, ModuleKind},
 };
-use miden_objects::account::AccountComponent;
 use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
 use std::sync::Arc;
@@ -64,8 +60,8 @@ pub async fn instantiate_client(endpoint: Endpoint) -> Result<Client, ClientErro
     let rpc_api = Arc::new(TonicRpcClient::new(&endpoint, timeout_ms));
 
     let client = ClientBuilder::new()
-        .with_rpc(rpc_api.clone())
-        .with_filesystem_keystore("./keystore")
+        .rpc(rpc_api.clone())
+        .filesystem_keystore("./keystore")
         .in_debug_mode(true)
         .build()
         .await?;
@@ -77,7 +73,7 @@ pub async fn instantiate_client(endpoint: Endpoint) -> Result<Client, ClientErro
 pub fn create_library(
     account_code: String,
     library_path: &str,
-) -> Result<miden_assembly::Library, Box<dyn std::error::Error>> {
+) -> Result<Library, Box<dyn std::error::Error>> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
     let source_manager = Arc::new(DefaultSourceManager::default());
     let module = Module::parser(ModuleKind::Library).parse_str(
@@ -102,7 +98,7 @@ pub async fn create_public_note(
         .unwrap()
         .with_debug_mode(true);
     let rng = client.rng();
-    let serial_num = rng.draw_word();
+    let serial_num = rng.inner_mut().draw_word();
     let note_script = NoteScript::compile(note_code, assembler.clone()).unwrap();
     let note_inputs = NoteInputs::new([].to_vec()).unwrap();
     let recipient = NoteRecipient::new(serial_num, note_script, note_inputs.clone());
@@ -119,7 +115,7 @@ pub async fn create_public_note(
     let note = Note::new(assets, metadata, recipient);
 
     let note_req = TransactionRequestBuilder::new()
-        .with_own_output_notes(vec![OutputNote::Full(note.clone())])
+        .own_output_notes(vec![OutputNote::Full(note.clone())])
         .build()
         .unwrap();
     let tx_result = client
@@ -142,12 +138,10 @@ pub async fn create_basic_account(
     client.rng().fill_bytes(&mut init_seed);
 
     let key_pair = SecretKey::with_rng(client.rng());
-    let anchor_block = client.get_latest_epoch_block().await.unwrap();
     let builder = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().unwrap())
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_component(RpoFalcon512::new(key_pair.public_key().clone()))
+        .with_auth_component(RpoFalcon512::new(key_pair.public_key().clone()))
         .with_component(BasicWallet);
     let (account, seed) = builder.build().unwrap();
     client.add_account(&account, Some(seed), false).await?;
@@ -162,6 +156,7 @@ pub async fn create_basic_account(
 pub async fn create_public_immutable_contract(
     client: &mut Client,
     account_code: &String,
+    keystore: FilesystemKeyStore<StdRng>,
 ) -> Result<(Account, Word), ClientError> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
 
@@ -178,19 +173,19 @@ pub async fn create_public_immutable_contract(
     .unwrap()
     .with_supports_all_types();
 
-    let anchor_block = client.get_latest_epoch_block().await.unwrap();
-
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
-
+    let key_pair = SecretKey::with_rng(client.rng());
     let (counter_contract, counter_seed) = AccountBuilder::new(init_seed)
-        .anchor((&anchor_block).try_into().unwrap())
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
+        .with_auth_component(RpoFalcon512::new(key_pair.public_key().clone()))
         .with_component(counter_component.clone())
         .build()
         .unwrap();
-
+    keystore
+        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
+        .unwrap();
     Ok((counter_contract, counter_seed))
 }
 
@@ -205,7 +200,7 @@ pub fn create_tx_script(
         None => Ok(assembler.with_debug_mode(true)),
     }
     .unwrap();
-    let tx_script = TransactionScript::compile(script_code, [], assembler).unwrap();
+    let tx_script = TransactionScript::compile(script_code, assembler).unwrap();
 
     Ok(tx_script)
 }

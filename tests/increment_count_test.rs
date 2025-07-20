@@ -7,10 +7,9 @@ use miden_client_tools::{
 };
 
 use miden_client::{
-    ClientError, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
+    ClientError, Word, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
-use miden_crypto::Word;
 use miden_objects::account::NetworkId;
 use std::{fs, path::Path};
 use tokio::time::{Duration, sleep};
@@ -20,6 +19,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     delete_keystore_and_store(None).await;
 
     let endpoint = Endpoint::localhost();
+    let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
     let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
@@ -31,7 +31,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
     let (counter_contract, counter_seed) =
-        create_public_immutable_contract(&mut client, &counter_code)
+        create_public_immutable_contract(&mut client, &counter_code, keystore)
             .await
             .unwrap();
     println!("contract id: {:?}", counter_contract.id().to_hex());
@@ -58,7 +58,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     // STEP 3: Build & Submit Transaction
     // -------------------------------------------------------------------------
     let tx_increment_request = TransactionRequestBuilder::new()
-        .with_custom_script(tx_script)
+        .custom_script(tx_script)
         .build()
         .unwrap();
 
@@ -130,7 +130,7 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
     let (counter_contract, counter_seed) =
-        create_public_immutable_contract(&mut client, &counter_code)
+        create_public_immutable_contract(&mut client, &counter_code, keystore)
             .await
             .unwrap();
     println!(
@@ -172,8 +172,8 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     let tx_script = create_tx_script(script_code, None).unwrap();
 
     let consume_custom_req = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes([(increment_note.id(), None)])
-        .with_custom_script(tx_script)
+        .authenticated_input_notes([(increment_note.id(), None)])
+        .custom_script(tx_script)
         .build()
         .unwrap();
 
