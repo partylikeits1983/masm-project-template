@@ -20,7 +20,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Instantiate client
     // -------------------------------------------------------------------------
     let endpoint = Endpoint::testnet();
-    let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
     let mut client = instantiate_client(endpoint, None).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
@@ -32,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
     let (counter_contract, counter_seed) =
-        create_public_immutable_contract(&mut client, &counter_code, keystore).await?;
+        create_public_immutable_contract(&mut client, &counter_code).await?;
 
     client
         .add_account(&counter_contract, Some(counter_seed), false)

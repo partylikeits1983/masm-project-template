@@ -21,7 +21,7 @@ use miden_objects::{
 };
 use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
-use std::sync::Arc;
+use std::{fs, path::Path, sync::Arc};
 
 use miden_crypto::rand::FeltRng;
 
@@ -152,11 +152,20 @@ pub async fn create_basic_account(
     Ok((account, key_pair))
 }
 
+pub async fn create_no_auth_component() -> Result<AccountComponent, Error> {
+    let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
+    let no_auth_code = fs::read_to_string(Path::new("./masm/auth/no_auth.masm")).unwrap();
+    let no_auth_component = AccountComponent::compile(no_auth_code, assembler.clone(), vec![])
+        .unwrap()
+        .with_supports_all_types();
+
+    Ok(no_auth_component)
+}
+
 // Contract builder helper function
 pub async fn create_public_immutable_contract(
     client: &mut Client,
     account_code: &String,
-    keystore: FilesystemKeyStore<StdRng>,
 ) -> Result<(Account, Word), ClientError> {
     let assembler: Assembler = TransactionKernel::assembler().with_debug_mode(true);
 
@@ -175,17 +184,15 @@ pub async fn create_public_immutable_contract(
 
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
-    let key_pair = SecretKey::with_rng(client.rng());
+    let no_auth_component = create_no_auth_component().await.unwrap();
     let (counter_contract, counter_seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(RpoFalcon512::new(key_pair.public_key().clone()))
+        .with_auth_component(no_auth_component)
         .with_component(counter_component.clone())
         .build()
         .unwrap();
-    keystore
-        .add_key(&AuthSecretKey::RpoFalcon512(key_pair.clone()))
-        .unwrap();
+
     Ok((counter_contract, counter_seed))
 }
 
