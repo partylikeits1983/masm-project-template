@@ -6,8 +6,9 @@ use miden_client_tools::{
     create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
 };
 
-use miden_client::{rpc::Endpoint, transaction::TransactionRequestBuilder};
-use miden_crypto::Word;
+use miden_client::{
+    Word, keystore::FilesystemKeyStore, rpc::Endpoint, transaction::TransactionRequestBuilder,
+};
 use miden_objects::account::NetworkId;
 use tokio::time::{Duration, sleep};
 
@@ -59,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // STEP 3 – Build & send transaction
     // -------------------------------------------------------------------------
     let tx_increment_request = TransactionRequestBuilder::new()
-        .with_custom_script(tx_script)
+        .custom_script(tx_script)
         .build()
         .unwrap();
 

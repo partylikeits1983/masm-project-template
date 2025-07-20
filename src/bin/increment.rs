@@ -5,8 +5,9 @@ use miden_client_tools::{
     create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
 };
 
-use miden_client::{account::AccountId, rpc::Endpoint, transaction::TransactionRequestBuilder};
-use miden_crypto::Word;
+use miden_client::{
+    Word, account::AccountId, rpc::Endpoint, transaction::TransactionRequestBuilder,
+};
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
@@ -26,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // STEP 1 – Query Counter State
     // -------------------------------------------------------------------------
     let (_network_id, counter_contract_id) =
-        AccountId::from_bech32("mtst1qq6uwe46p92uzqqqqwcrdvh0ry5waafp").unwrap();
+        AccountId::from_bech32("mtst1qr845cd3fadh5qrc96rvwqepsg8fjyts").unwrap();
 
     client
         .import_account_by_id(counter_contract_id)
@@ -59,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // STEP 3 – Build & send transaction
     // -------------------------------------------------------------------------
     let tx_increment_request = TransactionRequestBuilder::new()
-        .with_custom_script(tx_script)
+        .custom_script(tx_script)
         .build()
         .unwrap();
 

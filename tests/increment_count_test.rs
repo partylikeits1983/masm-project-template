@@ -7,10 +7,9 @@ use miden_client_tools::{
 };
 
 use miden_client::{
-    ClientError, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
+    ClientError, Word, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
-use miden_crypto::Word;
 use miden_objects::account::NetworkId;
 use std::{fs, path::Path};
 use tokio::time::{Duration, sleep};
@@ -58,7 +57,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     // STEP 3: Build & Submit Transaction
     // -------------------------------------------------------------------------
     let tx_increment_request = TransactionRequestBuilder::new()
-        .with_custom_script(tx_script)
+        .custom_script(tx_script)
         .build()
         .unwrap();
 
@@ -172,8 +171,8 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     let tx_script = create_tx_script(script_code, None).unwrap();
 
     let consume_custom_req = TransactionRequestBuilder::new()
-        .with_authenticated_input_notes([(increment_note.id(), None)])
-        .with_custom_script(tx_script)
+        .authenticated_input_notes([(increment_note.id(), None)])
+        .custom_script(tx_script)
         .build()
         .unwrap();
 
