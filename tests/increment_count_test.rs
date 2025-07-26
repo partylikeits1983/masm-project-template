@@ -18,7 +18,7 @@ use tokio::time::{Duration, sleep};
 async fn increment_counter_with_script() -> Result<(), ClientError> {
     delete_keystore_and_store(None).await;
 
-    let endpoint = Endpoint::localhost();
+    let endpoint = Endpoint::testnet();
     let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
@@ -66,7 +66,13 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
         .await
         .unwrap();
 
-    let _ = client.submit_transaction(tx_result).await;
+    let _ = client.submit_transaction(tx_result.clone()).await;
+
+    let tx_id = tx_result.executed_transaction().id();
+    println!(
+        "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
+        tx_id
+    );
 
     // -------------------------------------------------------------------------
     // STEP 4: Validate Updated State
@@ -104,7 +110,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
 async fn increment_counter_with_note() -> Result<(), ClientError> {
     delete_keystore_and_store(None).await;
 
-    let endpoint = Endpoint::localhost();
+    let endpoint = Endpoint::testnet();
     let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
 
     let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
@@ -163,10 +169,9 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     // STEP 4: Consume the Note
     // -------------------------------------------------------------------------
-    wait_for_note(&mut client, None, &increment_note)
-        .await
-        .unwrap();
+    wait_for_note(&mut client, None, &increment_note).await?;
 
+    /*
     let script_code = fs::read_to_string(Path::new("./masm/scripts/nop_script.masm")).unwrap();
     let tx_script = create_tx_script(script_code, None).unwrap();
 
@@ -180,7 +185,7 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
         .new_transaction(counter_contract.id(), consume_custom_req)
         .await
         .unwrap();
-    let _ = client.submit_transaction(tx_result).await;
+    let _ = client.submit_transaction(tx_result).await; */
 
     // -------------------------------------------------------------------------
     // STEP 5: Validate Updated State

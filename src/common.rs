@@ -23,8 +23,6 @@ use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
 use std::{fs, path::Path, sync::Arc};
 
-use miden_crypto::rand::FeltRng;
-
 // Clears keystore & default sqlite file
 pub async fn delete_keystore_and_store() {
     let store_path = "./store.sqlite3";
@@ -102,7 +100,9 @@ pub async fn create_public_note(
     let note_script = NoteScript::compile(note_code, assembler.clone()).unwrap();
     let note_inputs = NoteInputs::new([].to_vec()).unwrap();
     let recipient = NoteRecipient::new(serial_num, note_script, note_inputs.clone());
-    let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
+
+    // @dev when using `NoteExecutionMode::Network` the tx will fail
+    let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Network).unwrap();
     let metadata = NoteMetadata::new(
         creator_account.id(),
         NoteType::Public,
@@ -123,9 +123,15 @@ pub async fn create_public_note(
         .await
         .unwrap();
 
-    let _ = client.submit_transaction(tx_result).await;
-    client.sync_state().await.unwrap();
+    let _ = client.submit_transaction(tx_result.clone()).await;
 
+    let tx_id = tx_result.executed_transaction().id();
+    println!(
+        "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
+        tx_id
+    );
+    // @dev fails here:
+    // client.sync_state().await.unwrap();
     Ok(note)
 }
 

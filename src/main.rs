@@ -6,9 +6,7 @@ use miden_client_tools::{
     create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
 };
 
-use miden_client::{
-    Word, keystore::FilesystemKeyStore, rpc::Endpoint, transaction::TransactionRequestBuilder,
-};
+use miden_client::{Word, rpc::Endpoint, transaction::TransactionRequestBuilder};
 use miden_objects::account::NetworkId;
 use tokio::time::{Duration, sleep};
 
