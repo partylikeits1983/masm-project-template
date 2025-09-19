@@ -8,7 +8,6 @@ use masm_project_template::common::{
 use miden_client::{
     Word,
     account::{AccountIdAddress, Address, AddressInterface},
-    keystore::FilesystemKeyStore,
     rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
