@@ -1,33 +1,35 @@
 // src/main.rs  — cargo run
 use std::{fs, path::Path};
 
-use miden_client_tools::{
+use masm_project_template::common::{
     create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
 };
-
-use miden_client::{
-    Word, account::AccountId, rpc::Endpoint, transaction::TransactionRequestBuilder,
-};
+use miden_client::{Word, account::Address, rpc::Endpoint, transaction::TransactionRequestBuilder};
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
     // -------------------------------------------------------------------------
     // Instantiate client
     // -------------------------------------------------------------------------
     let endpoint = Endpoint::testnet();
-    let mut client = instantiate_client(endpoint, None).await.unwrap();
+    let mut client = instantiate_client(endpoint).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
     println!("⛓  Latest block: {}", sync_summary.block_num);
 
     // -------------------------------------------------------------------------
     // STEP 1 – Query Counter State
-    // -------------------------------------------------------------------------
     let (_network_id, counter_contract_id) =
-        AccountId::from_bech32("mtst1qr845cd3fadh5qrc96rvwqepsg8fjyts").unwrap();
+        Address::from_bech32("mtst1qpcls0rfcszxvqrhnvn3xvqvapcqqg88tg9").unwrap();
+
+    // Extract account ID from the address
+    let counter_contract_id = match counter_contract_id {
+        Address::AccountId(account_id_address) => account_id_address.id(),
+        _ => panic!("Invalid address"),
+    };
 
     client
         .import_account_by_id(counter_contract_id)

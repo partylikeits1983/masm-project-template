@@ -1,26 +1,28 @@
 use std::{fs, path::Path};
 
-use masm_project_template::common::create_public_immutable_contract;
-
-use miden_client_tools::{
-    create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
+use masm_project_template::common::{
+    create_library, create_public_immutable_contract, create_tx_script, delete_keystore_and_store,
+    instantiate_client,
 };
 
 use miden_client::{
-    Word, keystore::FilesystemKeyStore, rpc::Endpoint, transaction::TransactionRequestBuilder,
+    Word,
+    account::{AccountIdAddress, Address, AddressInterface},
+    rpc::Endpoint,
+    transaction::TransactionRequestBuilder,
 };
 use miden_objects::account::NetworkId;
 use tokio::time::{Duration, sleep};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
     // -------------------------------------------------------------------------
     // Instantiate client
     // -------------------------------------------------------------------------
     let endpoint = Endpoint::testnet();
-    let mut client = instantiate_client(endpoint, None).await.unwrap();
+    let mut client = instantiate_client(endpoint).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
     println!("⛓  Latest block: {}", sync_summary.block_num);
@@ -37,10 +39,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_account(&counter_contract, Some(counter_seed), false)
         .await
         .unwrap();
+    let addr = AccountIdAddress::new(counter_contract.id(), AddressInterface::Unspecified);
 
+    // build address of faucet
+    let address = Address::AccountId(addr);
     println!(
         "📄 Counter contract ID: {}",
-        counter_contract.id().to_bech32(NetworkId::Testnet)
+        address.to_bech32(NetworkId::Testnet)
     );
 
     // -------------------------------------------------------------------------
@@ -79,10 +84,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------------------------
 
     // Deleting keystore & store to show how to fetch public state
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
     let endpoint = Endpoint::testnet();
-    let mut client = instantiate_client(endpoint, None).await?;
+    let mut client = instantiate_client(endpoint).await?;
 
     client
         .import_account_by_id(counter_contract.id())
