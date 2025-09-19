@@ -1,5 +1,5 @@
 use miden_client::{
-    Client, ClientError, Felt, Word,
+    Client as MidenClient, ClientError, DebugMode, Felt, ScriptBuilder, Word,
     account::{Account, AccountBuilder, AccountId, AccountStorageMode, AccountType, StorageSlot},
     auth::AuthSecretKey,
     builder::ClientBuilder,
@@ -13,7 +13,10 @@ use miden_client::{
     store::{InputNoteRecord, NoteFilter},
     transaction::{OutputNote, TransactionRequestBuilder, TransactionScript},
 };
-use miden_lib::account::{auth::RpoFalcon512, wallets::BasicWallet};
+use miden_lib::account::{
+    auth::{self, AuthRpoFalcon512},
+    wallets::BasicWallet,
+};
 use miden_lib::transaction::TransactionKernel;
 use miden_objects::{
     account::AccountComponent,
@@ -23,7 +26,7 @@ use rand::{RngCore, rngs::StdRng};
 use serde::de::value::Error;
 use std::{fs, path::Path, sync::Arc};
 
-use miden_crypto::rand::FeltRng;
+type Client = MidenClient<FilesystemKeyStore<rand::prelude::StdRng>>;
 
 // Clears keystore & default sqlite file
 pub async fn delete_keystore_and_store() {
@@ -62,7 +65,7 @@ pub async fn instantiate_client(endpoint: Endpoint) -> Result<Client, ClientErro
     let client = ClientBuilder::new()
         .rpc(rpc_api.clone())
         .filesystem_keystore("./keystore")
-        .in_debug_mode(true)
+        .in_debug_mode(DebugMode::Enabled)
         .build()
         .await?;
 
@@ -89,17 +92,14 @@ pub fn create_library(
 pub async fn create_public_note(
     client: &mut Client,
     note_code: String,
-    account_library: Library,
     creator_account: Account,
     assets: NoteAssets,
 ) -> Result<Note, Error> {
-    let assembler = TransactionKernel::assembler()
-        .with_library(&account_library)
-        .unwrap()
-        .with_debug_mode(true);
+    let assembler = TransactionKernel::assembler().with_debug_mode(true);
     let rng = client.rng();
     let serial_num = rng.inner_mut().draw_word();
-    let note_script = NoteScript::compile(note_code, assembler.clone()).unwrap();
+    let program = assembler.clone().assemble_program(note_code).unwrap();
+    let note_script = NoteScript::new(program);
     let note_inputs = NoteInputs::new([].to_vec()).unwrap();
     let recipient = NoteRecipient::new(serial_num, note_script, note_inputs.clone());
     let tag = NoteTag::for_public_use_case(0, 0, NoteExecutionMode::Local).unwrap();
@@ -141,7 +141,7 @@ pub async fn create_basic_account(
     let builder = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountUpdatableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(RpoFalcon512::new(key_pair.public_key().clone()))
+        .with_auth_component(AuthRpoFalcon512::new(key_pair.public_key().clone()))
         .with_component(BasicWallet);
     let (account, seed) = builder.build().unwrap();
     client.add_account(&account, Some(seed), false).await?;
@@ -172,23 +172,22 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::compile(
         account_code.clone(),
         assembler.clone(),
-        vec![StorageSlot::Value([
+        vec![StorageSlot::Value(Word::new([
             Felt::new(0),
             Felt::new(0),
             Felt::new(0),
             Felt::new(0),
-        ])],
+        ]))],
     )
     .unwrap()
     .with_supports_all_types();
 
     let mut init_seed = [0_u8; 32];
     client.rng().fill_bytes(&mut init_seed);
-    let no_auth_component = create_no_auth_component().await.unwrap();
     let (counter_contract, counter_seed) = AccountBuilder::new(init_seed)
         .account_type(AccountType::RegularAccountImmutableCode)
         .storage_mode(AccountStorageMode::Public)
-        .with_auth_component(no_auth_component)
+        .with_auth_component(auth::NoAuth)
         .with_component(counter_component.clone())
         .build()
         .unwrap();
@@ -200,16 +199,17 @@ pub fn create_tx_script(
     script_code: String,
     library: Option<Library>,
 ) -> Result<TransactionScript, Error> {
-    let assembler = TransactionKernel::assembler();
+    if let Some(lib) = library {
+        return Ok(ScriptBuilder::new(true)
+            .with_dynamically_linked_library(&lib)
+            .unwrap()
+            .compile_tx_script(script_code)
+            .unwrap());
+    };
 
-    let assembler = match library {
-        Some(lib) => assembler.with_library(lib),
-        None => Ok(assembler.with_debug_mode(true)),
-    }
-    .unwrap();
-    let tx_script = TransactionScript::compile(script_code, assembler).unwrap();
-
-    Ok(tx_script)
+    Ok(ScriptBuilder::new(true)
+        .compile_tx_script(script_code)
+        .unwrap())
 }
 
 // Waits for note

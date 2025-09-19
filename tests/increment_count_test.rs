@@ -1,13 +1,13 @@
 use masm_project_template::common::{
-    create_basic_account, create_public_immutable_contract, create_public_note, wait_for_note,
+    create_basic_account, create_library, create_public_immutable_contract, create_public_note,
+    create_tx_script, delete_keystore_and_store, instantiate_client, wait_for_note,
 };
-
-use miden_client_tools::{
-    create_library, create_tx_script, delete_keystore_and_store, instantiate_client,
-};
-
 use miden_client::{
-    ClientError, Word, keystore::FilesystemKeyStore, note::NoteAssets, rpc::Endpoint,
+    ClientError, Word,
+    account::{AccountIdAddress, Address, AddressInterface},
+    keystore::FilesystemKeyStore,
+    note::NoteAssets,
+    rpc::Endpoint,
     transaction::TransactionRequestBuilder,
 };
 use miden_objects::account::NetworkId;
@@ -16,10 +16,10 @@ use tokio::time::{Duration, sleep};
 
 #[tokio::test]
 async fn increment_counter_with_script() -> Result<(), ClientError> {
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
     let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
+    let mut client = instantiate_client(endpoint.clone()).await.unwrap();
 
     let sync_summary = client.sync_state().await.unwrap();
     println!("Latest block: {}", sync_summary.block_num);
@@ -73,9 +73,9 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     sleep(Duration::from_secs(7)).await;
 
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
-    let mut client = instantiate_client(endpoint, None).await.unwrap();
+    let mut client = instantiate_client(endpoint).await.unwrap();
 
     client
         .import_account_by_id(counter_contract.id())
@@ -102,10 +102,10 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
 
 #[tokio::test]
 async fn increment_counter_with_note() -> Result<(), ClientError> {
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
     let endpoint = Endpoint::localhost();
-    let mut client = instantiate_client(endpoint.clone(), None).await.unwrap();
+    let mut client = instantiate_client(endpoint.clone()).await.unwrap();
 
     let keystore = FilesystemKeyStore::new("./keystore".into()).unwrap();
 
@@ -118,9 +118,16 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     let (alice_account, _) = create_basic_account(&mut client, keystore.clone())
         .await
         .unwrap();
+
+    let alice_account_address =
+        AccountIdAddress::new(alice_account.id(), AddressInterface::BasicWallet);
+
+    // build address of faucet
+    let alice_account_address = Address::AccountId(alice_account_address);
+
     println!(
         "alice account id: {:?}",
-        alice_account.id().to_bech32(NetworkId::Testnet)
+        alice_account_address.to_bech32(NetworkId::Testnet)
     );
 
     // -------------------------------------------------------------------------
@@ -132,9 +139,14 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
         create_public_immutable_contract(&mut client, &counter_code)
             .await
             .unwrap();
+    let counter_contract_address =
+        AccountIdAddress::new(counter_contract.id(), AddressInterface::Unspecified);
+
+    // build address of faucet
+    let counter_contract_address = Address::AccountId(counter_contract_address);
     println!(
         "contract id: {:?}",
-        counter_contract.id().to_bech32(NetworkId::Testnet)
+        counter_contract_address.to_bech32(NetworkId::Testnet)
     );
 
     client
@@ -153,10 +165,9 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
 
     let note_assets = NoteAssets::new(vec![]).unwrap();
 
-    let increment_note =
-        create_public_note(&mut client, note_code, library, alice_account, note_assets)
-            .await
-            .unwrap();
+    let increment_note = create_public_note(&mut client, note_code, alice_account, note_assets)
+        .await
+        .unwrap();
 
     println!("increment note created, waiting for onchain commitment");
 
@@ -187,9 +198,9 @@ async fn increment_counter_with_note() -> Result<(), ClientError> {
     // -------------------------------------------------------------------------
     sleep(Duration::from_secs(5)).await;
 
-    delete_keystore_and_store(None).await;
+    delete_keystore_and_store().await;
 
-    let mut client = instantiate_client(endpoint, None).await.unwrap();
+    let mut client = instantiate_client(endpoint).await.unwrap();
 
     client
         .import_account_by_id(counter_contract.id())
