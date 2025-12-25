@@ -20,7 +20,7 @@ cargo test --release -- --nocapture --test-threads=1
 ```
 
 ### Run the miden-node locally:
-1) Install & setup miden-node:
+1) Install & set up miden-node:
 ```bash
 ./scripts/setup_node.sh
 ```
