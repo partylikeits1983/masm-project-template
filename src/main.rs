@@ -54,10 +54,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let script_code =
         fs::read_to_string(Path::new("./masm/scripts/increment_script.masm")).unwrap();
 
-    let account_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
     let library_path = "external_contract::counter_contract";
 
-    let library = create_library(account_code, library_path).unwrap();
+    let library = create_library(counter_code.clone(), library_path).unwrap();
 
     let tx_script = create_tx_script(script_code, Some(library)).unwrap();
 
