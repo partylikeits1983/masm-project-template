@@ -48,7 +48,7 @@ async fn increment_counter_with_script() -> Result<(), ClientError> {
 
     let library_path = "external_contract::counter_contract";
 
-    let library = create_library(counter_code.clone(), library_path).unwrap();
+    let library = create_library(counter_code, library_path).unwrap();
 
     let tx_script = create_tx_script(script_code, Some(library)).unwrap();
 
