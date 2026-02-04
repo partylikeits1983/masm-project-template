@@ -70,8 +70,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .new_transaction(counter_contract_id, tx_increment_request)
         .await
         .unwrap();
-
-    let _ = client.submit_transaction(tx_result.clone()).await;
+    let tx_id = tx_result.executed_transaction().id();
+    let _ = client.submit_transaction(tx_result).await;
 
     println!("🚀 Increment transaction submitted – waiting for finality …");
     sleep(Duration::from_secs(7)).await;
@@ -92,7 +92,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("✅ Success! The counter was incremented.");
 
-    let tx_id = tx_result.executed_transaction().id();
     println!(
         "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
         tx_id
