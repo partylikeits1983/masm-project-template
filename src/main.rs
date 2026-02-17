@@ -56,7 +56,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let library_path = "external_contract::counter_contract";
 
-    let library = create_library(counter_code.clone(), library_path).unwrap();
+    let library = create_library(counter_code, library_path).unwrap();
 
     let tx_script = create_tx_script(script_code, Some(library)).unwrap();
 
@@ -72,8 +72,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .new_transaction(counter_contract.id(), tx_increment_request)
         .await
         .unwrap();
-
-    let _ = client.submit_transaction(tx_result.clone()).await;
+    let tx_id = tx_result.executed_transaction().id();
+    let _ = client.submit_transaction(tx_result).await;
 
     println!("🚀 Increment transaction submitted – waiting for finality …");
     sleep(Duration::from_secs(7)).await;
@@ -103,7 +103,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔢 Counter value after tx: {}", counter_val);
     println!("✅ Success! The counter was incremented.");
 
-    let tx_id = tx_result.executed_transaction().id();
     println!(
         "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
         tx_id
