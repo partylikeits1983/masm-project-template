@@ -2,7 +2,7 @@ use.miden::account
 use.std::sys
 
 # => []
-export.get_count
+export get_count
     push.0
     # => [index]
 
@@ -14,7 +14,7 @@ export.get_count
 end
 
 # => []
-export.increment
+export increment
     push.0
     # => [index]
 

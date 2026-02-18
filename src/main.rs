@@ -2,17 +2,11 @@ use std::{fs, path::Path};
 
 use masm_project_template::common::{
     create_library, create_public_immutable_contract, create_tx_script, delete_keystore_and_store,
-    instantiate_client,
+    instantiate_client, wait_for_tx,
 };
 
-use miden_client::{
-    Word,
-    account::{AccountIdAddress, Address, AddressInterface},
-    rpc::Endpoint,
-    transaction::TransactionRequestBuilder,
-};
-use miden_objects::account::NetworkId;
-use tokio::time::{Duration, sleep};
+use miden_client::{Word, rpc::Endpoint, transaction::TransactionRequestBuilder};
+use miden_protocol::address::NetworkId;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -28,28 +22,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("⛓  Latest block: {}", sync_summary.block_num);
 
     // -------------------------------------------------------------------------
-    // STEP 1 – Deploy the counter contract
+    // STEP 1 – Deploy the counter contract
     // -------------------------------------------------------------------------
     let counter_code = fs::read_to_string(Path::new("./masm/accounts/counter.masm")).unwrap();
 
-    let (counter_contract, counter_seed) =
-        create_public_immutable_contract(&mut client, &counter_code).await?;
+    let counter_contract = create_public_immutable_contract(&mut client, &counter_code).await?;
 
-    client
-        .add_account(&counter_contract, Some(counter_seed), false)
-        .await
-        .unwrap();
-    let addr = AccountIdAddress::new(counter_contract.id(), AddressInterface::Unspecified);
+    client.add_account(&counter_contract, false).await.unwrap();
 
-    // build address of faucet
-    let address = Address::AccountId(addr);
     println!(
         "📄 Counter contract ID: {}",
-        address.to_bech32(NetworkId::Testnet)
+        counter_contract.id().to_bech32(NetworkId::Testnet)
     );
 
     // -------------------------------------------------------------------------
-    // STEP 2 – Compile the increment script
+    // STEP 2 – Compile the increment script
     // -------------------------------------------------------------------------
     let script_code =
         fs::read_to_string(Path::new("./masm/scripts/increment_script.masm")).unwrap();
@@ -61,25 +48,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tx_script = create_tx_script(script_code, Some(library)).unwrap();
 
     // -------------------------------------------------------------------------
-    // STEP 3 – Build & send transaction
+    // STEP 3 – Build & send transaction
     // -------------------------------------------------------------------------
     let tx_increment_request = TransactionRequestBuilder::new()
         .custom_script(tx_script)
         .build()
         .unwrap();
 
-    let tx_result = client
-        .new_transaction(counter_contract.id(), tx_increment_request)
+    let tx_id = client
+        .submit_new_transaction(counter_contract.id(), tx_increment_request)
         .await
         .unwrap();
-    let tx_id = tx_result.executed_transaction().id();
-    let _ = client.submit_transaction(tx_result).await;
 
     println!("🚀 Increment transaction submitted – waiting for finality …");
-    sleep(Duration::from_secs(7)).await;
+    wait_for_tx(&mut client, tx_id).await?;
 
     // -------------------------------------------------------------------------
-    // STEP 4 – Fetch contract state & verify
+    // STEP 4 – Fetch contract state & verify
     // -------------------------------------------------------------------------
 
     // Deleting keystore & store to show how to fetch public state
@@ -93,12 +78,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    let account_state = client
+    let account_record = client
         .get_account(counter_contract.id())
         .await?
         .expect("counter contract not found");
 
-    let word: Word = account_state.account().storage().get_item(0)?.into();
+    let word: Word = match account_record.account_data() {
+        miden_client::store::AccountRecordData::Full(account) => account
+            .storage()
+            .slots()
+            .get(0)
+            .ok_or("No storage slot at index 0")?
+            .content()
+            .value(),
+        miden_client::store::AccountRecordData::Partial(partial_account) => {
+            partial_account
+                .storage()
+                .header()
+                .slots()
+                .nth(0)
+                .ok_or("No storage slot at index 0")?
+                .1
+        }
+    };
     let counter_val = word.get(3).unwrap().as_int();
     println!("🔢 Counter value after tx: {}", counter_val);
     println!("✅ Success! The counter was incremented.");

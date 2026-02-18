@@ -5,20 +5,17 @@ edition = "2024"
 default-run = "masm-project-template"
 
 [dependencies]
-miden-client = { version = "0.11.6", features = ["testing", "tonic", "sqlite"] }
-miden-lib = { version = "0.11.4", default-features = false }
-miden-objects = { version = "0.11.4", default-features = false }
-miden-crypto = { version = "0.17.0", features = ["executable"] }
-miden-tx = "0.11.4"
-miden-assembly = "0.17.2"
+miden-client              = { features = ["tonic"], git = "https://github.com/0xMiden/miden-client.git", tag = "exp-agglayer-v0.2.2" }
+miden-client-sqlite-store = { git = "https://github.com/0xMiden/miden-client.git", tag = "exp-agglayer-v0.2.2" }
+miden-protocol            = { default-features = false, version = "0.13.2" }
+
+# pin transitive dependencies
+miden-protocol-macros = { version = "0.13.2" }
+miden-standards       = { version = "0.13.2" }
+miden-tx              = { version = "0.13.2" }
+
 rand = { version = "0.9" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1.0", features = ["raw_value"] }
-tokio = { version = "1.40", features = [
-    "rt-multi-thread",
-    "net",
-    "macros",
-    "fs",
-] }
+tokio = { version = "1.46", features = ["rt-multi-thread", "net", "macros", "fs"] }
 rand_chacha = "0.9.0"
-miden-client-tools = "0.2.4"
