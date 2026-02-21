@@ -5,7 +5,12 @@ use masm_project_template::common::{
     instantiate_client, wait_for_tx,
 };
 
-use miden_client::{Word, rpc::Endpoint, transaction::TransactionRequestBuilder};
+use miden_client::{
+    Word,
+    account::{Account, StorageSlotName},
+    rpc::Endpoint,
+    transaction::TransactionRequestBuilder,
+};
 use miden_protocol::address::NetworkId;
 
 #[tokio::main]
@@ -78,29 +83,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    let account_record = client
+    let account_record: Account = client
         .get_account(counter_contract.id())
         .await?
-        .expect("counter contract not found");
+        .unwrap()
+        .try_into()
+        .unwrap();
 
-    let word: Word = match account_record.account_data() {
-        miden_client::store::AccountRecordData::Full(account) => account
-            .storage()
-            .slots()
-            .get(0)
-            .ok_or("No storage slot at index 0")?
-            .content()
-            .value(),
-        miden_client::store::AccountRecordData::Partial(partial_account) => {
-            partial_account
-                .storage()
-                .header()
-                .slots()
-                .nth(0)
-                .ok_or("No storage slot at index 0")?
-                .1
-        }
-    };
+    let storage_slot_name = StorageSlotName::new("counter::counter_slot")?;
+    let word: Word = account_record
+        .storage()
+        .get_item(&storage_slot_name)
+        .unwrap();
+
     let counter_val = word.get(3).unwrap().as_int();
     println!("🔢 Counter value after tx: {}", counter_val);
     println!("✅ Success! The counter was incremented.");

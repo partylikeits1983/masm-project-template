@@ -200,7 +200,7 @@ pub async fn create_public_immutable_contract(
     let counter_component = AccountComponent::new(
         code,
         vec![StorageSlot::with_value(
-            "counter_slot".parse()?,
+            "counter::counter_slot".parse()?,
             Word::new([Felt::new(0), Felt::new(0), Felt::new(0), Felt::new(0)]),
         )],
     )?

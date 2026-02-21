@@ -1,4 +1,9 @@
-use.miden::account
-export.auth__basic
-    push.1 exec.account::incr_nonce
+use miden::protocol::native_account
+
+pub proc auth__basic
+    exec.native_account::incr_nonce
+    # => [new_nonce]
+
+    drop
+    # => []
 end

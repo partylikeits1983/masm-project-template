@@ -1,5 +1,6 @@
-use.external_contract::counter_contract
-
+use external_contract::counter_contract
+use miden::core::sys
 begin
     call.counter_contract::increment
+    # => []
 end

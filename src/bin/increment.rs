@@ -3,7 +3,12 @@ use std::{fs, path::Path};
 use masm_project_template::common::{
     create_library, create_tx_script, delete_keystore_and_store, instantiate_client, wait_for_tx,
 };
-use miden_client::{Word, rpc::Endpoint, transaction::TransactionRequestBuilder};
+use miden_client::{
+    Word,
+    account::{Account, StorageSlotName},
+    rpc::Endpoint,
+    transaction::TransactionRequestBuilder,
+};
 use miden_protocol::account::AccountId;
 
 #[tokio::main]
@@ -21,7 +26,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // -------------------------------------------------------------------------
     // STEP 1 – Query Counter State
-    let counter_contract_id = AccountId::from_bech32("mtst1qpcls0rfcszxvqrhnvn3xvqvapcqqg88tg9")
+    let counter_contract_id = AccountId::from_bech32("mtst1azxmwd8waj5cuqq24h995zc73snfrp89")
         .map_err(|e| format!("Invalid bech32 address: {}", e))?
         .1;
 
@@ -30,29 +35,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
         .unwrap();
 
-    let account_record = client
+    let account_record: Account = client
         .get_account(counter_contract_id)
         .await?
-        .expect("counter contract not found");
+        .unwrap()
+        .try_into()
+        .unwrap();
 
-    let word: Word = match account_record.account_data() {
-        miden_client::store::AccountRecordData::Full(account) => account
-            .storage()
-            .slots()
-            .get(0)
-            .ok_or("No storage slot at index 0")?
-            .content()
-            .value(),
-        miden_client::store::AccountRecordData::Partial(partial_account) => {
-            partial_account
-                .storage()
-                .header()
-                .slots()
-                .nth(0)
-                .ok_or("No storage slot at index 0")?
-                .1
-        }
-    };
+    let storage_slot_name = StorageSlotName::new("counter::counter_slot")?;
+    let word: Word = account_record
+        .storage()
+        .get_item(&storage_slot_name)
+        .unwrap();
+
     let counter_val = word.get(3).unwrap().as_int();
     println!("🔢 Counter value before tx: {}", counter_val);
 
@@ -90,34 +85,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // -------------------------------------------------------------------------
     client.sync_state().await.unwrap();
 
-    let account_record = client
+    let account_record: Account = client
         .get_account(counter_contract_id)
         .await?
-        .expect("counter contract not found");
+        .unwrap()
+        .try_into()
+        .unwrap();
 
-    let word: Word = match account_record.account_data() {
-        miden_client::store::AccountRecordData::Full(account) => account
-            .storage()
-            .slots()
-            .get(0)
-            .ok_or("No storage slot at index 0")?
-            .content()
-            .value(),
-        miden_client::store::AccountRecordData::Partial(partial_account) => {
-            partial_account
-                .storage()
-                .header()
-                .slots()
-                .nth(0)
-                .ok_or("No storage slot at index 0")?
-                .1
-        }
-    };
+    let storage_slot_name = StorageSlotName::new("counter::counter_slot")?;
+    let word: Word = account_record
+        .storage()
+        .get_item(&storage_slot_name)
+        .unwrap();
+
     let counter_val = word.get(3).unwrap().as_int();
     println!("🔢 Counter value after tx: {}", counter_val);
 
     println!("✅ Success! The counter was incremented.");
-
     println!(
         "View transaction on MidenScan: https://testnet.midenscan.com/tx/{:?}",
         tx_id

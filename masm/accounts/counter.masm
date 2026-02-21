@@ -1,12 +1,15 @@
-use.miden::account
-use.std::sys
+use miden::protocol::active_account
+use miden::protocol::native_account
+use miden::core::sys
+
+const COUNTER_SLOT_ID = word("counter::counter_slot")
 
 # => []
-export get_count
-    push.0
-    # => [index]
+pub proc get_count
+    push.COUNTER_SLOT_ID[0..2]
+    # => [slot_id_prefix, slot_id_suffix]
 
-    exec.account::get_item
+    exec.active_account::get_item
     # => [count]
 
     exec.sys::truncate_stack
@@ -14,23 +17,21 @@ export get_count
 end
 
 # => []
-export increment
-    push.0
-    # => [index]
+pub proc increment
+    exec.get_count
 
-    exec.account::get_item
-    # => [count]
-
-    push.1 add
-    # => [count+1]
+    add.1
 
     # debug statement with client
     push.111 debug.stack drop
 
-    push.0
-    # [index, count+1]
+    push.COUNTER_SLOT_ID[0..2]
+    # => [slot_id_prefix, slot_id_suffix]
 
-    exec.account::set_item
+    exec.native_account::set_item
+    # => [OLD_VALUE]
+
+    dropw
     # => []
 
     exec.sys::truncate_stack
